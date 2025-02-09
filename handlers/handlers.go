@@ -2,45 +2,56 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
+	"log"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/Yandex-Practicum/final-project/utils"
 )
 
 func NextData(w http.ResponseWriter, r *http.Request) {
-	resp := make(map[string]string)
+	response := struct {
+		Error string `json:"error,omitempty"`
+		Date  string `json:"date,omitempty"`
+	}{}
+
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-	now := r.URL.Query().Get("now")
-	currDate, err := time.Parse(utils.TimeFormat, now)
+
+	query := r.URL.Query()
+	params := []string{"now", "date", "repeat"}
+	for _, param := range params {
+		if !query.Has(param) {
+			response.Error = fmt.Sprintf("пропущен обязательный параметр: %s", param)
+			sendResponse(w, http.StatusBadRequest, response)
+			return
+		}
+	}
+
+	currDate, err := time.Parse(utils.TimeFormat, query.Get("now"))
 	if err != nil {
-		resp["error"] = err.Error()
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(resp)
+		response.Error = fmt.Sprintf("неправильный формат даты: %v", err)
+		sendResponse(w, http.StatusBadRequest, response)
 		return
 	}
-	date := r.URL.Query().Get("date")
-	repeat := r.URL.Query().Get("repeat")
-	nextdate, err := utils.NextDate(currDate, date, repeat)
+	nextDate, err := utils.NextDate(
+		currDate,
+		query.Get("date"),
+		query.Get("repeat"),
+	)
 	if err != nil {
-		resp["error"] = err.Error()
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(resp)
+		response.Error = err.Error()
+		sendResponse(w, http.StatusBadRequest, response)
 		return
 	}
-	answer, err := strconv.Atoi(nextdate)
+	response.Date = nextDate
+	sendResponse(w, http.StatusOK, response)
+}
+
+func sendResponse(w http.ResponseWriter, status int, data interface{}) {
+	w.WriteHeader(status)
+	err := json.NewEncoder(w).Encode(data)
 	if err != nil {
-		resp["error"] = err.Error()
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(resp)
-		return
-	}
-	err = json.NewEncoder(w).Encode(answer)
-	if err != nil {
-		resp["error"] = err.Error()
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(resp)
-		return
+		log.Printf("не удалось закодировать ответ: %v", err)
 	}
 }

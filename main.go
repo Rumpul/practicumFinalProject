@@ -11,9 +11,6 @@ import (
 )
 
 func main() {
-	// now, _ := time.Parse(utils.TimeFormat, "20240126")
-	// date, _ := utils.NextDate(now, "20240125", "w 1")
-	// fmt.Println(date)
 	err := godotenv.Load()
 	if err != nil {
 		log.Panicf("Some error occured. Err: %s", err)
