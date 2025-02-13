@@ -1,14 +1,14 @@
 package db
 
 import (
-	"database/sql"
 	"fmt"
 	"os"
 
+	"github.com/jmoiron/sqlx"
 	_ "modernc.org/sqlite"
 )
 
-func CreateDB() (*sql.DB, error) {
+func CreateDB() (*sqlx.DB, error) {
 	dbFile := os.Getenv("TODO_DBFILE")
 	_, err := os.Stat(dbFile)
 	var install bool
@@ -28,6 +28,7 @@ func CreateDB() (*sql.DB, error) {
 	}
 	return db, nil
 }
+
 func CreateTable(path string) error {
 	db, err := OpenSql(path)
 
@@ -53,8 +54,8 @@ func CreateTable(path string) error {
 	return db.Close()
 }
 
-func OpenSql(path string) (*sql.DB, error) {
-	db, err := sql.Open("sqlite", path)
+func OpenSql(path string) (*sqlx.DB, error) {
+	db, err := sqlx.Open("sqlite", path)
 	if err != nil {
 		return nil, fmt.Errorf("db open error: %w", err)
 	}

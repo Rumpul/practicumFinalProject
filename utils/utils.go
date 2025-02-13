@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-var TimeFormat = "20060102"
+const TimeFormat = "20060102"
 
 func NextDate(now time.Time, date string, repeat string) (string, error) {
 	if repeat == "" {
