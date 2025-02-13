@@ -166,3 +166,22 @@ func SearchTask(db *sqlx.DB, search string) ([]models.Task, error) {
 
 	return res, nil
 }
+
+func DeleteTask(db *sqlx.DB, id string) error {
+	deleteQuery := `DELETE FROM scheduler WHERE id = ?`
+	res, err := db.Exec(deleteQuery, id)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return errors.New("задача не найдена")
+	}
+
+	return nil
+}

@@ -46,18 +46,18 @@ func HandleEditTask(db *sqlx.DB) http.HandlerFunc {
 		var task models.Task
 		err := json.NewDecoder(r.Body).Decode(&task)
 		if err != nil {
-			log.Printf("Ошибка десериализации JSON: %v", err)
+			log.Printf("ошибка десериализации JSON: %v", err)
 			http.Error(w, `{"error": "Ошибка десериализации JSON"}`, http.StatusBadRequest)
 			return
 		}
 
 		if task.Id == "" {
-			log.Printf("не указан идентификатор задачи")
+			log.Println("не указан идентификатор задачи")
 			http.Error(w, `{"error": "Не указан идентификатор задачи"}`, http.StatusBadRequest)
 			return
 		}
 		if task.Title == "" {
-			log.Printf("не указан заголовок задачи")
+			log.Println("не указан заголовок задачи")
 			http.Error(w, `{"error": "Не указан заголовок задачи"}`, http.StatusBadRequest)
 			return
 		}
@@ -79,7 +79,7 @@ func HandleEditTask(db *sqlx.DB) http.HandlerFunc {
 			} else {
 				nextDate, err := utils.NextDate(now, task.Date, task.Repeat)
 				if err != nil {
-					log.Printf(`{"error": "` + err.Error() + `"}`)
+					log.Println(err.Error())
 					http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusBadRequest)
 					return
 				}
@@ -88,6 +88,7 @@ func HandleEditTask(db *sqlx.DB) http.HandlerFunc {
 		}
 		err = database.EditTask(db, task)
 		if err != nil {
+			log.Println(err.Error())
 			if err.Error() == "задача не найдена" {
 				http.Error(w, `{"error": "Задача не найдена"}`, http.StatusNotFound)
 			} else {
@@ -105,6 +106,7 @@ func HandleGetTask(db *sqlx.DB) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 		query := r.URL.Query()
 		if !query.Has("id") {
+			log.Println("отсутствует индентификатор")
 			http.Error(w, `{"error": "Отсутствует индентификатор"}`, http.StatusInternalServerError)
 			return
 		}
@@ -129,7 +131,7 @@ func HandleGetTasks(db *sqlx.DB) http.HandlerFunc {
 		search := r.URL.Query().Get("search")
 		var tasks []models.Task
 		var err error
-		if len(search) > 0 {
+		if search != "" {
 			tasks, err = database.SearchTask(db, search)
 		} else {
 			tasks, err = database.GetTasks(db, LimitTasks)
@@ -146,6 +148,31 @@ func HandleGetTasks(db *sqlx.DB) http.HandlerFunc {
 		if err != nil {
 			log.Printf("не удалось закодировать ответ: %v", err)
 		}
+	}
+}
+
+func HandleDeleteTask(db *sqlx.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+		query := r.URL.Query()
+		if !query.Has("id") {
+			log.Println("отсутствует индентификатор")
+			http.Error(w, `{"error": "Отсутствует индентификатор"}`, http.StatusInternalServerError)
+			return
+		}
+		id := query.Get("id")
+		err := database.DeleteTask(db, id)
+		if err != nil {
+			log.Println(err.Error())
+			if err.Error() == "задача не найдена" {
+				http.Error(w, `{"error": "Задача не найдена"}`, http.StatusNotFound)
+			} else {
+				http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusInternalServerError)
+			}
+			return
+		}
+
+		json.NewEncoder(w).Encode(map[string]interface{}{})
 	}
 }
 
