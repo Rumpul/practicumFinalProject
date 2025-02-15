@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -80,7 +79,7 @@ func HandleEditTask(db *sqlx.DB) http.HandlerFunc {
 				nextDate, err := utils.NextDate(now, task.Date, task.Repeat)
 				if err != nil {
 					log.Println(err.Error())
-					http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusBadRequest)
+					http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusInternalServerError)
 					return
 				}
 				task.Date = nextDate
@@ -89,15 +88,14 @@ func HandleEditTask(db *sqlx.DB) http.HandlerFunc {
 		err = database.EditTask(db, task)
 		if err != nil {
 			log.Println(err.Error())
-			if err.Error() == "задача не найдена" {
-				http.Error(w, `{"error": "Задача не найдена"}`, http.StatusNotFound)
-			} else {
-				http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusInternalServerError)
-			}
+			http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusInternalServerError)
 			return
 		}
 
-		json.NewEncoder(w).Encode(map[string]interface{}{})
+		err = json.NewEncoder(w).Encode(map[string]interface{}{})
+		if err != nil {
+			log.Printf("не удалось закодировать ответ: %v", err)
+		}
 	}
 }
 
@@ -107,7 +105,7 @@ func HandleGetTask(db *sqlx.DB) http.HandlerFunc {
 		query := r.URL.Query()
 		if !query.Has("id") {
 			log.Println("отсутствует индентификатор")
-			http.Error(w, `{"error": "Отсутствует индентификатор"}`, http.StatusInternalServerError)
+			http.Error(w, `{"error": "Отсутствует индентификатор"}`, http.StatusBadRequest)
 			return
 		}
 		id := query.Get("id")
@@ -157,47 +155,86 @@ func HandleDeleteTask(db *sqlx.DB) http.HandlerFunc {
 		query := r.URL.Query()
 		if !query.Has("id") {
 			log.Println("отсутствует индентификатор")
-			http.Error(w, `{"error": "Отсутствует индентификатор"}`, http.StatusInternalServerError)
+			http.Error(w, `{"error": "Отсутствует индентификатор"}`, http.StatusBadRequest)
 			return
 		}
 		id := query.Get("id")
 		err := database.DeleteTask(db, id)
 		if err != nil {
 			log.Println(err.Error())
-			if err.Error() == "задача не найдена" {
-				http.Error(w, `{"error": "Задача не найдена"}`, http.StatusNotFound)
-			} else {
-				http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusInternalServerError)
-			}
+			http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusInternalServerError)
 			return
 		}
 
-		json.NewEncoder(w).Encode(map[string]interface{}{})
+		err = json.NewEncoder(w).Encode(map[string]interface{}{})
+		if err != nil {
+			log.Printf("не удалось закодировать ответ: %v", err)
+		}
+	}
+}
+
+func HandleTaskDone(db *sqlx.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+		query := r.URL.Query()
+		if !query.Has("id") {
+			log.Println("отсутствует индентификатор")
+			http.Error(w, `{"error": "Отсутствует индентификатор"}`, http.StatusBadRequest)
+			return
+		}
+		id := query.Get("id")
+		task, err := database.GetTask(db, id)
+		if err != nil {
+			log.Println(err.Error())
+			http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusInternalServerError)
+			return
+		}
+
+		if task.Repeat == "" {
+			err := database.DeleteTask(db, id)
+			if err != nil {
+				http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusInternalServerError)
+				return
+			}
+		} else {
+			now := time.Now()
+			nextDate, err := utils.NextDate(now, task.Date, task.Repeat)
+			if err != nil {
+				log.Println(err.Error())
+				http.Error(w, `{"error": "Ошибка вычисления следующей даты"}`, http.StatusInternalServerError)
+				return
+			}
+			task.Date = nextDate
+			err = database.EditTask(db, task)
+			if err != nil {
+				log.Println(err.Error())
+				http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusInternalServerError)
+				return
+			}
+		}
+
+		err = json.NewEncoder(w).Encode(map[string]interface{}{})
+		if err != nil {
+			log.Printf("не удалось закодировать ответ: %v", err)
+		}
 	}
 }
 
 func NextData(w http.ResponseWriter, r *http.Request) {
-	response := struct {
-		Error string `json:"error,omitempty"`
-		Date  string `json:"date,omitempty"`
-	}{}
-
-	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-
 	query := r.URL.Query()
 	params := []string{"now", "date", "repeat"}
 	for _, param := range params {
 		if !query.Has(param) {
-			response.Error = fmt.Sprintf("пропущен обязательный параметр: %s", param)
-			sendResponse(w, http.StatusBadRequest, response)
+			log.Printf("пропущен обязательный параметр: %s", param)
+			http.Error(w, `{"error": "Пропущен обязательный параметр"}`, http.StatusBadRequest)
 			return
 		}
 	}
 
 	currDate, err := time.Parse(utils.TimeFormat, query.Get("now"))
 	if err != nil {
-		response.Error = fmt.Sprintf("неправильный формат даты: %v", err)
-		sendResponse(w, http.StatusBadRequest, response)
+		log.Printf("неправильный формат даты: %v", err)
+		http.Error(w, `{"error": "Неправильный формат даты"}`, http.StatusBadRequest)
 		return
 	}
 	nextDate, err := utils.NextDate(
@@ -206,18 +243,9 @@ func NextData(w http.ResponseWriter, r *http.Request) {
 		query.Get("repeat"),
 	)
 	if err != nil {
-		response.Error = err.Error()
-		sendResponse(w, http.StatusBadRequest, response)
+		log.Println(err.Error())
+		http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusInternalServerError)
 		return
 	}
-	response.Date = nextDate
-	sendResponse(w, http.StatusOK, response)
-}
-
-func sendResponse(w http.ResponseWriter, status int, data interface{}) {
-	w.WriteHeader(status)
-	err := json.NewEncoder(w).Encode(data)
-	if err != nil {
-		log.Printf("не удалось закодировать ответ: %v", err)
-	}
+	w.Write([]byte(nextDate))
 }

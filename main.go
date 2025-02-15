@@ -7,7 +7,8 @@ import (
 
 	"github.com/Yandex-Practicum/final-project/db"
 	"github.com/Yandex-Practicum/final-project/handlers"
-	"github.com/go-chi/chi"
+	"github.com/Yandex-Practicum/final-project/middleware"
+	"github.com/go-chi/chi/v5"
 	"github.com/joho/godotenv"
 )
 
@@ -25,10 +26,16 @@ func main() {
 	mux := chi.NewRouter()
 	mux.Handle("/*", http.FileServer(http.Dir("./web")))
 	mux.Get("/api/nextdate", handlers.NextData)
-	mux.Post("/api/task", handlers.HandleAddTask(db))
-	mux.Get("/api/task", handlers.HandleGetTask(db))
-	mux.Put("/api/task", handlers.HandleEditTask(db))
-	mux.Get("/api/tasks", handlers.HandleGetTasks(db))
+
+	mux.Post("/api/task", middleware.Auth(handlers.HandleAddTask(db)))
+	mux.Get("/api/task", middleware.Auth(handlers.HandleGetTask(db)))
+	mux.Put("/api/task", middleware.Auth(handlers.HandleEditTask(db)))
+	mux.Delete("/api/task", middleware.Auth(handlers.HandleDeleteTask(db)))
+
+	mux.Post("/api/task/done", middleware.Auth(handlers.HandleTaskDone(db)))
+
+	mux.Get("/api/tasks", middleware.Auth(handlers.HandleGetTasks(db)))
+
 	err = http.ListenAndServe(web_server_port, mux)
 	if err != nil {
 		panic(err)

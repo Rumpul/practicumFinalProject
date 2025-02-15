@@ -72,30 +72,13 @@ func EditTask(db *sqlx.DB, task models.Task) error {
 }
 
 func GetTask(db *sqlx.DB, id string) (models.Task, error) {
-	rows, err := db.NamedQuery(`SELECT id, date, title, comment, repeat 
-	FROM scheduler WHERE id = :id`, map[string]interface{}{
-		"id": id,
-	})
+	var task models.Task
+	query := `SELECT id, date, title, comment, repeat FROM scheduler WHERE id = ?`
+	err := db.QueryRow(query, id).Scan(&task.Id, &task.Date, &task.Title, &task.Comment, &task.Repeat)
 	if err != nil {
-		return models.Task{}, err
+		return task, err
 	}
-	defer rows.Close()
-
-	var res models.Task
-	for rows.Next() {
-		task := models.Task{}
-		err := rows.Scan(&task.Id, &task.Date, &task.Title, &task.Comment, &task.Repeat)
-		if err != nil {
-			return res, err
-		}
-		res = task
-	}
-	err = rows.Err()
-	if err != nil {
-		return res, err
-	}
-
-	return res, nil
+	return task, nil
 }
 
 func GetTasks(db *sqlx.DB, limit int) ([]models.Task, error) {
