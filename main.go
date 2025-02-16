@@ -25,6 +25,7 @@ func main() {
 	web_server_port := os.Getenv("TODO_PORT")
 	mux := chi.NewRouter()
 	mux.Handle("/*", http.FileServer(http.Dir("./web")))
+	mux.Post("/api/signin", handlers.HangdleLogin)
 	mux.Get("/api/nextdate", handlers.NextData)
 
 	mux.Post("/api/task", middleware.Auth(handlers.HandleAddTask(db)))
