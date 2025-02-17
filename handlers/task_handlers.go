@@ -8,12 +8,12 @@ import (
 
 	"github.com/Yandex-Practicum/final-project/dates"
 	"github.com/Yandex-Practicum/final-project/models"
-	"github.com/Yandex-Practicum/final-project/storage"
+	"github.com/Yandex-Practicum/final-project/service"
 )
 
 const LimitTasks = 50
 
-func HandleAddTask(storage *storage.TaskStorage) http.HandlerFunc {
+func HandleAddTask(service *service.TaskService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 
@@ -25,7 +25,7 @@ func HandleAddTask(storage *storage.TaskStorage) http.HandlerFunc {
 			return
 		}
 
-		id, err := storage.AddTask(task)
+		id, err := service.AddTask(task)
 		if err != nil {
 			log.Printf("ошибка добавления задачи: %v", err)
 			http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusInternalServerError)
@@ -39,7 +39,7 @@ func HandleAddTask(storage *storage.TaskStorage) http.HandlerFunc {
 	}
 }
 
-func HandleEditTask(storage *storage.TaskStorage) http.HandlerFunc {
+func HandleEditTask(service *service.TaskService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 
@@ -88,7 +88,7 @@ func HandleEditTask(storage *storage.TaskStorage) http.HandlerFunc {
 			}
 		}
 
-		err = storage.EditTask(task)
+		err = service.EditTask(task)
 		if err != nil {
 			log.Println(err.Error())
 			http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusInternalServerError)
@@ -102,7 +102,7 @@ func HandleEditTask(storage *storage.TaskStorage) http.HandlerFunc {
 	}
 }
 
-func HandleGetTask(storage *storage.TaskStorage) http.HandlerFunc {
+func HandleGetTask(service *service.TaskService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 		query := r.URL.Query()
@@ -114,7 +114,7 @@ func HandleGetTask(storage *storage.TaskStorage) http.HandlerFunc {
 		}
 
 		id := query.Get("id")
-		task, err := storage.GetTask(id)
+		task, err := service.GetTask(id)
 		if err != nil {
 			log.Printf("ошибка получения задачи: %v", err)
 			http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusInternalServerError)
@@ -128,7 +128,7 @@ func HandleGetTask(storage *storage.TaskStorage) http.HandlerFunc {
 	}
 }
 
-func HandleGetTasks(storage *storage.TaskStorage) http.HandlerFunc {
+func HandleGetTasks(service *service.TaskService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 		search := r.URL.Query().Get("search")
@@ -136,9 +136,9 @@ func HandleGetTasks(storage *storage.TaskStorage) http.HandlerFunc {
 		var err error
 
 		if search != "" {
-			tasks, err = storage.SearchTask(search)
+			tasks, err = service.SearchTasks(search)
 		} else {
-			tasks, err = storage.GetTasks(LimitTasks)
+			tasks, err = service.GetTasks(LimitTasks)
 		}
 
 		if err != nil {
@@ -158,7 +158,7 @@ func HandleGetTasks(storage *storage.TaskStorage) http.HandlerFunc {
 	}
 }
 
-func HandleDeleteTask(storage *storage.TaskStorage) http.HandlerFunc {
+func HandleDeleteTask(service *service.TaskService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 		query := r.URL.Query()
@@ -170,7 +170,7 @@ func HandleDeleteTask(storage *storage.TaskStorage) http.HandlerFunc {
 		}
 
 		id := query.Get("id")
-		err := storage.DeleteTask(id)
+		err := service.DeleteTask(id)
 		if err != nil {
 			log.Println(err.Error())
 			http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusInternalServerError)
@@ -184,7 +184,7 @@ func HandleDeleteTask(storage *storage.TaskStorage) http.HandlerFunc {
 	}
 }
 
-func HandleTaskDone(storage *storage.TaskStorage) http.HandlerFunc {
+func HandleTaskDone(service *service.TaskService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 		query := r.URL.Query()
@@ -196,7 +196,7 @@ func HandleTaskDone(storage *storage.TaskStorage) http.HandlerFunc {
 		}
 
 		id := query.Get("id")
-		task, err := storage.GetTask(id)
+		task, err := service.GetTask(id)
 		if err != nil {
 			log.Println(err.Error())
 			http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusInternalServerError)
@@ -204,7 +204,7 @@ func HandleTaskDone(storage *storage.TaskStorage) http.HandlerFunc {
 		}
 
 		if task.Repeat == "" {
-			err := storage.DeleteTask(id)
+			err := service.DeleteTask(id)
 			if err != nil {
 				http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusInternalServerError)
 				return
@@ -218,7 +218,7 @@ func HandleTaskDone(storage *storage.TaskStorage) http.HandlerFunc {
 				return
 			}
 			task.Date = nextDate
-			err = storage.EditTask(task)
+			err = service.EditTask(task)
 			if err != nil {
 				log.Println(err.Error())
 				http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusInternalServerError)
