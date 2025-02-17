@@ -6,16 +6,14 @@ import (
 	"net/http"
 	"time"
 
-	database "github.com/Yandex-Practicum/final-project/db"
+	"github.com/Yandex-Practicum/final-project/dates"
 	"github.com/Yandex-Practicum/final-project/models"
-	"github.com/Yandex-Practicum/final-project/utils"
-	"github.com/jmoiron/sqlx"
-	_ "modernc.org/sqlite"
+	"github.com/Yandex-Practicum/final-project/storage"
 )
 
 const LimitTasks = 50
 
-func HandleAddTask(db *sqlx.DB) http.HandlerFunc {
+func HandleAddTask(storage *storage.TaskStorage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 
@@ -27,12 +25,13 @@ func HandleAddTask(db *sqlx.DB) http.HandlerFunc {
 			return
 		}
 
-		id, err := database.AddTask(db, task)
+		id, err := storage.AddTask(task)
 		if err != nil {
 			log.Printf("ошибка добавления задачи: %v", err)
 			http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusInternalServerError)
 			return
 		}
+
 		err = json.NewEncoder(w).Encode(map[string]interface{}{"id": id})
 		if err != nil {
 			log.Printf("не удалось закодировать ответ: %v", err)
@@ -40,8 +39,10 @@ func HandleAddTask(db *sqlx.DB) http.HandlerFunc {
 	}
 }
 
-func HandleEditTask(db *sqlx.DB) http.HandlerFunc {
+func HandleEditTask(storage *storage.TaskStorage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+
 		var task models.Task
 		err := json.NewDecoder(r.Body).Decode(&task)
 		if err != nil {
@@ -60,10 +61,11 @@ func HandleEditTask(db *sqlx.DB) http.HandlerFunc {
 			http.Error(w, `{"error": "Не указан заголовок задачи"}`, http.StatusBadRequest)
 			return
 		}
+
 		if task.Date == "" {
-			task.Date = time.Now().Format(utils.TimeFormat)
+			task.Date = time.Now().Format(dates.TimeFormat)
 		} else {
-			_, err := time.Parse(utils.TimeFormat, task.Date)
+			_, err := time.Parse(dates.TimeFormat, task.Date)
 			if err != nil {
 				log.Printf("дата представлена в неправильном формате")
 				http.Error(w, `{"error": "Дата представлена в неправильном формате"}`, http.StatusBadRequest)
@@ -72,11 +74,11 @@ func HandleEditTask(db *sqlx.DB) http.HandlerFunc {
 		}
 
 		now := time.Now()
-		if task.Date < now.Format(utils.TimeFormat) {
+		if task.Date < now.Format(dates.TimeFormat) {
 			if task.Repeat == "" {
-				task.Date = now.Format(utils.TimeFormat)
+				task.Date = now.Format(dates.TimeFormat)
 			} else {
-				nextDate, err := utils.NextDate(now, task.Date, task.Repeat)
+				nextDate, err := dates.NextDate(now, task.Date, task.Repeat)
 				if err != nil {
 					log.Println(err.Error())
 					http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusInternalServerError)
@@ -85,7 +87,8 @@ func HandleEditTask(db *sqlx.DB) http.HandlerFunc {
 				task.Date = nextDate
 			}
 		}
-		err = database.EditTask(db, task)
+
+		err = storage.EditTask(task)
 		if err != nil {
 			log.Println(err.Error())
 			http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusInternalServerError)
@@ -99,23 +102,25 @@ func HandleEditTask(db *sqlx.DB) http.HandlerFunc {
 	}
 }
 
-func HandleGetTask(db *sqlx.DB) http.HandlerFunc {
+func HandleGetTask(storage *storage.TaskStorage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 		query := r.URL.Query()
+
 		if !query.Has("id") {
-			log.Println("отсутствует индентификатор")
-			http.Error(w, `{"error": "Отсутствует индентификатор"}`, http.StatusBadRequest)
+			log.Println("отсутствует идентификатор")
+			http.Error(w, `{"error": "Отсутствует идентификатор"}`, http.StatusBadRequest)
 			return
 		}
+
 		id := query.Get("id")
-		var task models.Task
-		task, err := database.GetTask(db, id)
+		task, err := storage.GetTask(id)
 		if err != nil {
-			log.Printf("ошибка получения задач: %v", err)
+			log.Printf("ошибка получения задачи: %v", err)
 			http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusInternalServerError)
 			return
 		}
+
 		err = json.NewEncoder(w).Encode(task)
 		if err != nil {
 			log.Printf("не удалось закодировать ответ: %v", err)
@@ -123,25 +128,29 @@ func HandleGetTask(db *sqlx.DB) http.HandlerFunc {
 	}
 }
 
-func HandleGetTasks(db *sqlx.DB) http.HandlerFunc {
+func HandleGetTasks(storage *storage.TaskStorage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 		search := r.URL.Query().Get("search")
 		var tasks []models.Task
 		var err error
+
 		if search != "" {
-			tasks, err = database.SearchTask(db, search)
+			tasks, err = storage.SearchTask(search)
 		} else {
-			tasks, err = database.GetTasks(db, LimitTasks)
+			tasks, err = storage.GetTasks(LimitTasks)
 		}
+
 		if err != nil {
-			log.Printf("ошибка получения задачь: %v", err)
+			log.Printf("ошибка получения задач: %v", err)
 			http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusInternalServerError)
 			return
 		}
+
 		if tasks == nil {
 			tasks = []models.Task{}
 		}
+
 		err = json.NewEncoder(w).Encode(map[string]interface{}{"tasks": tasks})
 		if err != nil {
 			log.Printf("не удалось закодировать ответ: %v", err)
@@ -149,17 +158,19 @@ func HandleGetTasks(db *sqlx.DB) http.HandlerFunc {
 	}
 }
 
-func HandleDeleteTask(db *sqlx.DB) http.HandlerFunc {
+func HandleDeleteTask(storage *storage.TaskStorage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 		query := r.URL.Query()
+
 		if !query.Has("id") {
-			log.Println("отсутствует индентификатор")
-			http.Error(w, `{"error": "Отсутствует индентификатор"}`, http.StatusBadRequest)
+			log.Println("отсутствует идентификатор")
+			http.Error(w, `{"error": "Отсутствует идентификатор"}`, http.StatusBadRequest)
 			return
 		}
+
 		id := query.Get("id")
-		err := database.DeleteTask(db, id)
+		err := storage.DeleteTask(id)
 		if err != nil {
 			log.Println(err.Error())
 			http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusInternalServerError)
@@ -173,17 +184,19 @@ func HandleDeleteTask(db *sqlx.DB) http.HandlerFunc {
 	}
 }
 
-func HandleTaskDone(db *sqlx.DB) http.HandlerFunc {
+func HandleTaskDone(storage *storage.TaskStorage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 		query := r.URL.Query()
+
 		if !query.Has("id") {
-			log.Println("отсутствует индентификатор")
-			http.Error(w, `{"error": "Отсутствует индентификатор"}`, http.StatusBadRequest)
+			log.Println("отсутствует идентификатор")
+			http.Error(w, `{"error": "Отсутствует идентификатор"}`, http.StatusBadRequest)
 			return
 		}
+
 		id := query.Get("id")
-		task, err := database.GetTask(db, id)
+		task, err := storage.GetTask(id)
 		if err != nil {
 			log.Println(err.Error())
 			http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusInternalServerError)
@@ -191,21 +204,21 @@ func HandleTaskDone(db *sqlx.DB) http.HandlerFunc {
 		}
 
 		if task.Repeat == "" {
-			err := database.DeleteTask(db, id)
+			err := storage.DeleteTask(id)
 			if err != nil {
 				http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusInternalServerError)
 				return
 			}
 		} else {
 			now := time.Now()
-			nextDate, err := utils.NextDate(now, task.Date, task.Repeat)
+			nextDate, err := dates.NextDate(now, task.Date, task.Repeat)
 			if err != nil {
 				log.Println(err.Error())
 				http.Error(w, `{"error": "Ошибка вычисления следующей даты"}`, http.StatusInternalServerError)
 				return
 			}
 			task.Date = nextDate
-			err = database.EditTask(db, task)
+			err = storage.EditTask(task)
 			if err != nil {
 				log.Println(err.Error())
 				http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusInternalServerError)
@@ -231,13 +244,13 @@ func NextData(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	currDate, err := time.Parse(utils.TimeFormat, query.Get("now"))
+	currDate, err := time.Parse(dates.TimeFormat, query.Get("now"))
 	if err != nil {
 		log.Printf("неправильный формат даты: %v", err)
 		http.Error(w, `{"error": "Неправильный формат даты"}`, http.StatusBadRequest)
 		return
 	}
-	nextDate, err := utils.NextDate(
+	nextDate, err := dates.NextDate(
 		currDate,
 		query.Get("date"),
 		query.Get("repeat"),

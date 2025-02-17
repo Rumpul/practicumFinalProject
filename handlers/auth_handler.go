@@ -10,8 +10,9 @@ import (
 	"github.com/Yandex-Practicum/final-project/models"
 )
 
+var password = os.Getenv("TODO_PASSWORD")
+
 func HangdleLogin(w http.ResponseWriter, r *http.Request) {
-	password := os.Getenv("TODO_PASSWORD")
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	if len(password) > 0 {
 		var login models.Login

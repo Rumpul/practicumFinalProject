@@ -7,10 +7,10 @@ import (
 	"github.com/Yandex-Practicum/final-project/jwt"
 )
 
+var pass = os.Getenv("TODO_PASSWORD")
+
 func Auth(next http.HandlerFunc) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// смотрим наличие пароля
-		pass := os.Getenv("TODO_PASSWORD")
 		if len(pass) > 0 {
 			var cookieToken string
 			cookie, err := r.Cookie("token")
