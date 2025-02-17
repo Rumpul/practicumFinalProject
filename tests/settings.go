@@ -1,7 +1,7 @@
 package tests
 
-var Port = 7540
-var DBFile = "../scheduler.db"
-var FullNextDate = false
-var Search = false
-var Token = ``
+var Port = 8000
+var DBFile = "../storage/scheduler.db"
+var FullNextDate = true
+var Search = true
+var Token = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.LwimMJA3puF3ioGeS-tfczR3370GXBZMIL-bdpu4hOU`
